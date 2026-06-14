@@ -189,11 +189,11 @@ export class GameScene extends Phaser.Scene {
 
   // ── Toolbar ───────────────────────────────────────────────────────────────
   private createToolbar(): void {
-    // Toolbar background (184px tall below the grid)
-    this.add.rectangle(CANVAS_W / 2, TOOLBAR_Y + 92, CANVAS_W, 184, 0x0a0a18).setDepth(8);
-    this.add.rectangle(CANVAS_W / 2, TOOLBAR_Y + 1, CANVAS_W, 2, 0x334477).setDepth(8);
+    // Toolbar background
+    this.add.rectangle(CANVAS_W / 2, TOOLBAR_Y + 84, CANVAS_W, 168, 0x060610).setDepth(8);
+    this.add.rectangle(CANVAS_W / 2, TOOLBAR_Y + 1, CANVAS_W, 2, 0x2244aa).setDepth(8);
 
-    const btnW = 56, gap = 2;
+    const btnW = 72, gap = 3;
     const row1Tools = ALL_TOOLS.slice(0, 9);  // towers + miners
     const row2Tools = ALL_TOOLS.slice(9);      // buildings + delete
 
@@ -205,20 +205,23 @@ export class GameScene extends Phaser.Scene {
         const bx = startX + i * (btnW + gap) + btnW / 2;
         const by = rowY;
 
-        const btn = this.add.image(bx, by, 'btn').setDepth(9).setInteractive({ useHandCursor: true });
-        const icon = this.add.image(bx, by - 6, tool.texture).setScale(0.75).setDepth(10);
+        const btn = this.add.image(bx, by, 'btn').setDepth(9)
+          .setDisplaySize(btnW, btnW)
+          .setInteractive({ useHandCursor: true });
+        const icon = this.add.image(bx, by - 12, tool.texture).setScale(0.9).setDepth(10);
 
-        // Cost label
+        // Cost label  (bottom of button)
         const costStr = Object.entries(tool.cost)
           .map(([k, v]) => `${v}${k[0].toUpperCase()}`)
           .join(' ');
-        const costText = this.add.text(bx, by + 18, costStr, {
-          fontSize: '9px', fontFamily: 'monospace', color: '#aabbcc', align: 'center',
+        const costText = this.add.text(bx, by + 24, costStr, {
+          fontSize: '12px', fontFamily: 'monospace', color: '#99bbdd', align: 'center',
         }).setOrigin(0.5, 0.5).setDepth(10);
 
-        // Tool label
-        this.add.text(bx, by + 8, tool.label, {
-          fontSize: '8px', fontFamily: 'monospace', color: '#8899aa', align: 'center',
+        // Tool label (just below icon)
+        this.add.text(bx, by + 9, tool.label, {
+          fontSize: '11px', fontFamily: 'monospace', color: '#ccddee', align: 'center',
+          fontStyle: 'bold',
         }).setOrigin(0.5, 0.5).setDepth(10);
 
         btn.on('pointerover', () => {
@@ -235,15 +238,15 @@ export class GameScene extends Phaser.Scene {
       });
     };
 
-    makeRow(row1Tools, TOOLBAR_Y + 38);
-    makeRow(row2Tools, TOOLBAR_Y + 102);
+    makeRow(row1Tools, TOOLBAR_Y + 42);
+    makeRow(row2Tools, TOOLBAR_Y + 122);
 
-    // Label rows
-    this.add.text(8, TOOLBAR_Y + 38, 'TOWERS / MINERS', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#445566',
+    // Section labels
+    this.add.text(6, TOOLBAR_Y + 12, 'TOWERS  &  MINERS', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(9);
-    this.add.text(8, TOOLBAR_Y + 102, 'BUILDINGS', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#445566',
+    this.add.text(6, TOOLBAR_Y + 92, 'BUILDINGS  &  TOOLS', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(9);
   }
 

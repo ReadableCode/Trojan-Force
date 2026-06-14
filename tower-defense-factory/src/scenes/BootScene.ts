@@ -272,25 +272,25 @@ export class BootScene extends Phaser.Scene {
       g.fillRect(22, 10, 6, 4);
     });
 
-    // Toolbar button backgrounds
+    // Toolbar button backgrounds (72×72 for better touch/small-screen usability)
     mk('btn', g => {
       g.fillStyle(0x1a1a2e);
-      g.fillRect(0, 0, 56, 56);
+      g.fillRect(0, 0, 72, 72);
       g.lineStyle(2, 0x334477);
-      g.strokeRect(1, 1, 54, 54);
-    }, 56, 56);
+      g.strokeRect(1, 1, 70, 70);
+    }, 72, 72);
     mk('btn-sel', g => {
       g.fillStyle(0x1a2a1a);
-      g.fillRect(0, 0, 56, 56);
+      g.fillRect(0, 0, 72, 72);
       g.lineStyle(2, 0x44ff44);
-      g.strokeRect(1, 1, 54, 54);
-    }, 56, 56);
+      g.strokeRect(1, 1, 70, 70);
+    }, 72, 72);
     mk('btn-hover', g => {
       g.fillStyle(0x222244);
-      g.fillRect(0, 0, 56, 56);
+      g.fillRect(0, 0, 72, 72);
       g.lineStyle(2, 0x6688dd);
-      g.strokeRect(1, 1, 54, 54);
-    }, 56, 56);
+      g.strokeRect(1, 1, 70, 70);
+    }, 72, 72);
 
     g.destroy();
   }

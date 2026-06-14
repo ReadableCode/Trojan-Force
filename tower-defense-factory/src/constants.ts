@@ -1,16 +1,16 @@
 export const TILE_SIZE = 32;
 export const GRID_COLS = 32;
-export const GRID_ROWS = 18;
+export const GRID_ROWS = 16;
 export const GRID_OFFSET_X = 0;
-export const GRID_OFFSET_Y = 60;
+export const GRID_OFFSET_Y = 90;
 
 export const CANVAS_W = 1024;
-export const CANVAS_H = 820;
+export const CANVAS_H = 770;
 
 export const HUD_H = GRID_OFFSET_Y;
-export const GRID_H = GRID_ROWS * TILE_SIZE; // 576
-export const TOOLBAR_Y = GRID_OFFSET_Y + GRID_H; // 636
-export const TOOLBAR_H = CANVAS_H - TOOLBAR_Y; // 184
+export const GRID_H = GRID_ROWS * TILE_SIZE; // 512
+export const TOOLBAR_Y = GRID_OFFSET_Y + GRID_H; // 602
+export const TOOLBAR_H = CANVAS_H - TOOLBAR_Y; // 168
 
 export const CORE_HP = 200;
 export const BUILD_PHASE_SECS = 45;
