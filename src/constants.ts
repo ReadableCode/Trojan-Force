@@ -2,10 +2,10 @@ export const TILE_SIZE = 32;
 export const GRID_COLS = 32;
 export const GRID_ROWS = 16;
 export const GRID_OFFSET_X = 0;
-export const GRID_OFFSET_Y = 90;
+export const GRID_OFFSET_Y = 112;
 
 export const CANVAS_W = 1024;
-export const CANVAS_H = 770;
+export const CANVAS_H = 792;
 
 export const HUD_H = GRID_OFFSET_Y;
 export const GRID_H = GRID_ROWS * TILE_SIZE; // 512

@@ -122,11 +122,29 @@ export class Building {
 
   takeDamage(dmg: number): void {
     this.hp -= dmg;
+    this.updateDamageVisual();
     this.updateHpBar();
     if (this.hp <= 0) {
       this.hp = 0;
       this.alive = false;
     }
+  }
+
+  private updateDamageVisual(): void {
+    if (this.type !== 'wall' && this.type !== 'reinforcedWall') return;
+    const ratio = this.hp / this.maxHp;
+    if (ratio > 0.66) {
+      // Healthy — original color with slight darkening
+      this.sprite.setFillStyle(this.cfg.color);
+    } else if (ratio > 0.33) {
+      // Damaged — orange-brown tinge
+      this.sprite.setFillStyle(0xaa5511);
+    } else {
+      // Critical — red/dark
+      this.sprite.setFillStyle(0x881111);
+    }
+    // Also reduce alpha slightly
+    this.sprite.setAlpha(0.6 + ratio * 0.4);
   }
 
   private updateHpBar(): void {

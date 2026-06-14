@@ -11,12 +11,13 @@ const config: Phaser.Types.Core.GameConfig = {
   height: CANVAS_H,
   backgroundColor: '#0a0a1a',
   parent: 'game',
-  pixelArt: true,
-  antialias: false,
+  pixelArt: false,
+  antialias: true,
   scene: [BootScene, MenuScene, GameScene, UIScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    zoom: Phaser.Scale.MAX_ZOOM,
   },
 };
 

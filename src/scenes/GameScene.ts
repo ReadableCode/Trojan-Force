@@ -23,27 +23,38 @@ interface ToolItem {
   texture: string;
   cost: Partial<Record<string, number>>;
   category: 'tower' | 'wall' | 'miner' | 'support' | 'delete';
+  description: string;
 }
+
+const TOWER_DESCRIPTIONS: Record<string, string> = {
+  turret:        'Basic single-target fire. No ammo needed. Reliable all-rounder.',
+  cannon:        'Splash damage (1.5 tile radius). Consumes 2 Iron/shot. Excellent vs groups.',
+  tesla:         'Chain lightning hits up to 3 enemies. Needs Power (5/shot).',
+  flameTower:    'Burns Coal as fuel. Applies fire DoT. Great in tight corridors.',
+  crystalSniper: '9-tile range. Very slow but enormous single-target damage.',
+  laser:         'Pierces enemy armor. Needs Power (2/shot). Best vs Armored Tanks.',
+};
 
 const ALL_TOOLS: ToolItem[] = [
   // Towers
   ...Object.values(TOWER_DEFS).map(d => ({
     key: d.key, label: d.label, texture: d.key, cost: d.cost, category: 'tower' as const,
+    description: TOWER_DESCRIPTIONS[d.key] ?? '',
   })),
   // Miners
-  { key: 'drill',     label: 'Drill',       texture: 'drill',     cost: { iron: 20 },            category: 'miner'   as const },
-  { key: 'pumpDrill', label: 'Pump Drill',  texture: 'pumpDrill', cost: { iron: 10, copper: 10 }, category: 'miner'  as const },
+  { key: 'drill',     label: 'Drill',       texture: 'drill',     cost: { iron: 20 },            category: 'miner'   as const, description: 'Place on a resource patch. Mines 2 resources/sec passively.' },
+  { key: 'pumpDrill', label: 'Pump Drill',  texture: 'pumpDrill', cost: { iron: 10, copper: 10 }, category: 'miner'  as const, description: 'Faster drill — 4 resources/sec. Needs Copper to build.' },
   // Walls
-  { key: 'wall',           label: 'Wall',     texture: 'wall',           cost: { iron: 5 },             category: 'wall' as const },
-  { key: 'reinforcedWall', label: 'Rei. Wall',texture: 'reinforcedWall', cost: { iron: 5, copper: 5 },  category: 'wall' as const },
+  { key: 'wall',           label: 'Wall',     texture: 'wall',           cost: { iron: 5 },             category: 'wall' as const, description: 'Blocks enemy paths, 100 HP. Enemies will punch through over time.' },
+  { key: 'reinforcedWall', label: 'Rei. Wall',texture: 'reinforcedWall', cost: { iron: 5, copper: 5 },  category: 'wall' as const, description: 'Tougher wall, 300 HP. Worth the Copper for key chokepoints.' },
   // Support
-  { key: 'conveyor',       label: 'Conveyor', texture: 'conveyor',       cost: { iron: 3 },             category: 'support' as const },
-  { key: 'ammoCache',      label: 'Ammo Cache',texture: 'ammoCache',     cost: { iron: 10 },            category: 'support' as const },
-  { key: 'coalPowerPlant', label: 'Power Plant',texture: 'coalPowerPlant',cost: { iron: 30, coal: 20 }, category: 'support' as const },
-  { key: 'solarPanel',     label: 'Solar',    texture: 'solarPanel',     cost: { copper: 20, crystal: 10 }, category: 'support' as const },
-  { key: 'researchLab',    label: 'Lab',      texture: 'researchLab',    cost: { iron: 40, crystal: 20 }, category: 'support' as const },
+  { key: 'conveyor',       label: 'Conveyor', texture: 'conveyor',       cost: { iron: 3 },             category: 'support' as const, description: 'Routes ammo to adjacent towers. Press R to rotate direction.' },
+  { key: 'ammoCache',      label: 'Ammo Cache',texture: 'ammoCache',     cost: { iron: 10 },            category: 'support' as const, description: 'Buffers ammo near a tower so it never starves mid-wave.' },
+  { key: 'coalPowerPlant', label: 'Power Plant',texture: 'coalPowerPlant',cost: { iron: 30, coal: 20 }, category: 'support' as const, description: 'Generates 50 Power/sec. Burns 1 Coal/sec as fuel.' },
+  { key: 'solarPanel',     label: 'Solar',    texture: 'solarPanel',     cost: { copper: 20, crystal: 10 }, category: 'support' as const, description: 'Generates 20 Power/sec. Free fuel — just needs Copper + Crystal.' },
+  { key: 'researchLab',    label: 'Lab',      texture: 'researchLab',    cost: { iron: 40, crystal: 20 }, category: 'support' as const, description: 'Converts Crystal into permanent upgrades. Queue one item at a time.' },
   // Delete
-  { key: 'delete', label: 'Delete', texture: 'btn', cost: {}, category: 'delete' as const },
+  { key: 'delete', label: 'Delete', texture: 'btn', cost: {}, category: 'delete' as const, description: 'Click any building to sell it for 50% of its resource cost.' },
 ];
 
 type GamePhase = 'build' | 'wave' | 'gameover';
@@ -215,12 +226,12 @@ export class GameScene extends Phaser.Scene {
           .map(([k, v]) => `${v}${k[0].toUpperCase()}`)
           .join(' ');
         const costText = this.add.text(bx, by + 24, costStr, {
-          fontSize: '15px', fontFamily: 'monospace', color: '#99bbdd', align: 'center',
+          fontSize: '17px', fontFamily: 'monospace', color: '#99bbdd', align: 'center',
         }).setOrigin(0.5, 0.5).setDepth(10);
 
         // Tool label (just below icon)
         this.add.text(bx, by + 9, tool.label, {
-          fontSize: '14px', fontFamily: 'monospace', color: '#ccddee', align: 'center',
+          fontSize: '16px', fontFamily: 'monospace', color: '#ccddee', align: 'center',
           fontStyle: 'bold',
         }).setOrigin(0.5, 0.5).setDepth(10);
 
@@ -243,10 +254,10 @@ export class GameScene extends Phaser.Scene {
 
     // Section labels
     this.add.text(6, TOOLBAR_Y + 12, 'TOWERS  &  MINERS', {
-      fontSize: '16px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
+      fontSize: '18px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(9);
     this.add.text(6, TOOLBAR_Y + 92, 'BUILDINGS  &  TOOLS', {
-      fontSize: '16px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
+      fontSize: '18px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(9);
   }
 
@@ -696,6 +707,7 @@ export class GameScene extends Phaser.Scene {
         this.reroute();
       }
       if (bld.isMiner()) this.miners = this.miners.filter(m => m !== bld);
+      bld.destroy();          // ← ADD THIS LINE
       this.buildings.delete(k);
     }
 
