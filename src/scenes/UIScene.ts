@@ -52,33 +52,33 @@ export class UIScene extends Phaser.Scene {
 
     for (const r of RES) {
       this.add.text(r.x, 8, r.label, {
-        fontSize: '12px', fontFamily: MONO, color: r.color,
+        fontSize: '15px', fontFamily: MONO, color: r.color,
       });
-      this.resTexts[r.key] = this.add.text(r.x, 30, '0', {
-        fontSize: '26px', fontFamily: MONO, color: r.color, fontStyle: 'bold',
+      this.resTexts[r.key] = this.add.text(r.x, 42, '0', {
+        fontSize: '34px', fontFamily: MONO, color: r.color, fontStyle: 'bold',
       });
     }
 
     // Wave + timer (right side, stacked)
     this.waveText = this.add.text(CANVAS_W - 12, 8, 'Wave 0 / 20', {
-      fontSize: '15px', fontFamily: MONO, color: '#aaccff',
+      fontSize: '18px', fontFamily: MONO, color: '#aaccff',
     }).setOrigin(1, 0);
 
     this.timerText = this.add.text(CANVAS_W - 12, 32, 'BUILD  45s', {
-      fontSize: '22px', fontFamily: MONO, color: '#44ff88', fontStyle: 'bold',
+      fontSize: '28px', fontFamily: MONO, color: '#44ff88', fontStyle: 'bold',
     }).setOrigin(1, 0);
 
     this.timerText.setStroke('#002200', 3);
 
     // Core HP (centre)
-    this.coreHpText = this.add.text(CANVAS_W / 2, 58, `❤ CORE  ${CORE_HP}/${CORE_HP}`, {
-      fontSize: '18px', fontFamily: MONO, color: '#ffee55', fontStyle: 'bold',
+    this.coreHpText = this.add.text(CANVAS_W / 2, 68, `❤ CORE  ${CORE_HP}/${CORE_HP}`, {
+      fontSize: '22px', fontFamily: MONO, color: '#ffee55', fontStyle: 'bold',
       stroke: '#553300', strokeThickness: 3,
     }).setOrigin(0.5, 0);
 
     // Error flash (below HUD)
     this.errorText = this.add.text(CANVAS_W / 2, GRID_OFFSET_Y + 36, '', {
-      fontSize: '18px', fontFamily: MONO, color: '#ff4444',
+      fontSize: '22px', fontFamily: MONO, color: '#ff4444',
       stroke: '#220000', strokeThickness: 3,
     }).setOrigin(0.5, 0).setDepth(20).setAlpha(0);
   }
@@ -88,7 +88,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(30).setVisible(false);
     this.tooltipBg.setStrokeStyle(2, 0x3355aa);
     this.tooltipText = this.add.text(0, 0, '', {
-      fontSize: '13px', fontFamily: MONO, color: '#ccdeff',
+      fontSize: '16px', fontFamily: MONO, color: '#ccdeff',
       wordWrap: { width: 210 }, lineSpacing: 4,
     }).setDepth(31).setVisible(false).setOrigin(0.5, 0.5);
   }
@@ -97,17 +97,17 @@ export class UIScene extends Phaser.Scene {
     this.overlayBg = this.add.rectangle(CANVAS_W / 2, 385, CANVAS_W, 770, 0x000000, 0)
       .setDepth(50).setVisible(false);
     this.overlayTitle = this.add.text(CANVAS_W / 2, 240, '', {
-      fontSize: '56px', fontFamily: MONO, color: '#ffdd00',
+      fontSize: '64px', fontFamily: MONO, color: '#ffdd00',
       stroke: '#885500', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(51).setVisible(false);
     this.overlayBody = this.add.text(CANVAS_W / 2, 330, '', {
-      fontSize: '22px', fontFamily: MONO, color: '#ccddff', align: 'center', lineSpacing: 6,
+      fontSize: '26px', fontFamily: MONO, color: '#ccddff', align: 'center', lineSpacing: 6,
     }).setOrigin(0.5).setDepth(51).setVisible(false);
     this.overlayBtn = this.add.rectangle(CANVAS_W / 2, 440, 260, 60, 0x224422)
       .setDepth(51).setVisible(false).setStrokeStyle(2, 0x44ff44)
       .setInteractive({ useHandCursor: true });
     this.overlayBtnText = this.add.text(CANVAS_W / 2, 440, 'PLAY AGAIN', {
-      fontSize: '24px', fontFamily: MONO, color: '#44ff44',
+      fontSize: '28px', fontFamily: MONO, color: '#44ff44',
     }).setOrigin(0.5).setDepth(52).setVisible(false);
 
     this.overlayBtn.on('pointerover', () => this.overlayBtn.fillColor = 0x336633);
@@ -121,7 +121,7 @@ export class UIScene extends Phaser.Scene {
 
   private createAnnounce(): void {
     this.announceText = this.add.text(CANVAS_W / 2, 140, '', {
-      fontSize: '30px', fontFamily: MONO, color: '#ffdd00',
+      fontSize: '36px', fontFamily: MONO, color: '#ffdd00',
       stroke: '#553300', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(20).setAlpha(0);
   }

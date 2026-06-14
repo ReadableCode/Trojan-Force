@@ -215,12 +215,12 @@ export class GameScene extends Phaser.Scene {
           .map(([k, v]) => `${v}${k[0].toUpperCase()}`)
           .join(' ');
         const costText = this.add.text(bx, by + 24, costStr, {
-          fontSize: '12px', fontFamily: 'monospace', color: '#99bbdd', align: 'center',
+          fontSize: '15px', fontFamily: 'monospace', color: '#99bbdd', align: 'center',
         }).setOrigin(0.5, 0.5).setDepth(10);
 
         // Tool label (just below icon)
         this.add.text(bx, by + 9, tool.label, {
-          fontSize: '11px', fontFamily: 'monospace', color: '#ccddee', align: 'center',
+          fontSize: '14px', fontFamily: 'monospace', color: '#ccddee', align: 'center',
           fontStyle: 'bold',
         }).setOrigin(0.5, 0.5).setDepth(10);
 
@@ -243,10 +243,10 @@ export class GameScene extends Phaser.Scene {
 
     // Section labels
     this.add.text(6, TOOLBAR_Y + 12, 'TOWERS  &  MINERS', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
+      fontSize: '16px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(9);
     this.add.text(6, TOOLBAR_Y + 92, 'BUILDINGS  &  TOOLS', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
+      fontSize: '16px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(9);
   }
 
@@ -433,7 +433,10 @@ export class GameScene extends Phaser.Scene {
     for (const enemy of this.enemies) {
       if (!enemy.alive || enemy.def.flying || enemy.def.tunneling) continue;
       const { gx, gy } = worldToTile(enemy.x, enemy.y);
-      const path = this.pathfinder.findPath(gx, gy, CORE_POS.gx, CORE_POS.gy);
+      let path = this.pathfinder.findPath(gx, gy, CORE_POS.gx, CORE_POS.gy);
+      if (path.length === 0) {
+        path = this.pathfinder.findPath(gx, gy, CORE_POS.gx, CORE_POS.gy, true);
+      }
       enemy.setPath(path);
     }
   }
@@ -532,11 +535,21 @@ export class GameScene extends Phaser.Scene {
     const { x, y } = tileToWorld(gx, gy);
     const enemy = new Enemy(this, def, x, y, this._currentHpScale);
 
-    const path = this.buildPathFor(gx, gy, (def.flying ?? false) || (def.tunneling ?? false));
+    let path = this.buildPathFor(gx, gy, (def.flying ?? false) || (def.tunneling ?? false));
     if (path.length === 0 && !def.flying && !def.tunneling) {
-      // No path to core; spawn anyway but they'll idle
+      // No path through walls; use direct path so enemy can smash walls
+      path = this.pathfinder.findPath(gx, gy, CORE_POS.gx, CORE_POS.gy, true);
     }
     enemy.setPath(path);
+
+    enemy.checkBlocked = (gx, gy) => this.pathfinder.isBlocked(gx, gy);
+    enemy.onAttackBuilding = (gx, gy, damage) => {
+      const bld = this.buildings.get(tileKey(gx, gy));
+      if (bld instanceof Building) {
+        bld.takeDamage(damage);
+        this.cameras.main.shake(60, 0.003);
+      }
+    };
 
     enemy.onReachCore = (dmg) => {
       this.coreHp -= dmg;

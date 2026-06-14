@@ -19,18 +19,18 @@ export class MenuScene extends Phaser.Scene {
 
     // Title — TROJAN FORCE
     this.add.text(cx, 110, 'TROJAN', {
-      fontSize: '72px', fontFamily: MONO, color: '#ffcc00',
+      fontSize: '80px', fontFamily: MONO, color: '#ffcc00',
       stroke: '#885500', strokeThickness: 5, fontStyle: 'bold',
     }).setOrigin(0.5);
 
     this.add.text(cx, 186, 'FORCE', {
-      fontSize: '48px', fontFamily: MONO, color: '#ff7700',
+      fontSize: '56px', fontFamily: MONO, color: '#ff7700',
       stroke: '#442200', strokeThickness: 4, fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Tag line
     this.add.text(cx, 248, 'Build · Mine · Defend · Repeat', {
-      fontSize: '18px', fontFamily: MONO, color: '#7799bb',
+      fontSize: '22px', fontFamily: MONO, color: '#7799bb',
     }).setOrigin(0.5);
 
     // Resource legend — bigger and readable
@@ -44,10 +44,10 @@ export class MenuScene extends Phaser.Scene {
     legend.forEach(([icon, desc], i) => {
       const y = 295 + i * 32;
       this.add.text(cx - 220, y, icon, {
-        fontSize: '16px', fontFamily: MONO, color: '#ddeecc',
+        fontSize: '17px', fontFamily: MONO, color: '#ddeecc',
       }).setOrigin(0, 0.5);
       this.add.text(cx - 140, y, desc, {
-        fontSize: '15px', fontFamily: MONO, color: '#889aaa',
+        fontSize: '17px', fontFamily: MONO, color: '#889aaa',
       }).setOrigin(0, 0.5);
     });
 
@@ -74,13 +74,13 @@ export class MenuScene extends Phaser.Scene {
 
     // Controls
     this.add.text(cx, 582, 'Left-click to place   ·   Right-click to sell (50% refund)', {
-      fontSize: '14px', fontFamily: MONO, color: '#4a5e70',
+      fontSize: '16px', fontFamily: MONO, color: '#4a5e70',
     }).setOrigin(0.5);
     this.add.text(cx, 606, 'R = rotate conveyor   ·   ESC = deselect tool', {
-      fontSize: '14px', fontFamily: MONO, color: '#4a5e70',
+      fontSize: '16px', fontFamily: MONO, color: '#4a5e70',
     }).setOrigin(0.5);
     this.add.text(cx, 638, 'Defend the Core across 20 waves to win', {
-      fontSize: '15px', fontFamily: MONO, color: '#667788',
+      fontSize: '17px', fontFamily: MONO, color: '#667788',
     }).setOrigin(0.5);
 
     this.cameras.main.fadeIn(400);

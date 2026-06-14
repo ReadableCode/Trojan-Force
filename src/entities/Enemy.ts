@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { EnemyDef } from '../data/enemies';
-import { tileToWorld, TILE_SIZE } from '../constants';
+import { tileToWorld, TILE_SIZE, worldToTile } from '../constants';
 
 export type EnemySpawnCallback = (type: string, x: number, y: number) => void;
 
@@ -22,6 +22,15 @@ export class Enemy {
   onReachCore?: (damage: number) => void;
   onDie?: (enemy: Enemy) => void;
   onSpawnEnemy?: EnemySpawnCallback;
+
+  // Wall-smashing callbacks (set by GameScene)
+  checkBlocked?: (gx: number, gy: number) => boolean;
+  onAttackBuilding?: (gx: number, gy: number, damage: number) => void;
+
+  private wallAttackTimer = 0;
+  private readonly WALL_ATTACK_INTERVAL = 0.8;
+  private readonly WALL_ATTACK_DAMAGE = 25;
+  private noValidPath = false;
 
   // for Burrower: burrow under walls
   private burrowCooldown = 0;
@@ -52,6 +61,7 @@ export class Enemy {
   }
 
   setPath(path: Array<{ x: number; y: number }>): void {
+    this.noValidPath = path.length === 0;
     this.path = path.map(p => tileToWorld(p.x, p.y));
     if (this.path.length > 0) {
       this.path.shift(); // skip start tile
@@ -66,9 +76,50 @@ export class Enemy {
 
     this.updateDots(dt);
 
-    if (this.path.length === 0) return;
+    // Core tile grid position (must match CORE_POS in mapData)
+    const CORE_GX = 15, CORE_GY = 14;
 
+    // No path at all — smash the nearest blocked tile toward the core
+    if (this.path.length === 0) {
+      if (this.noValidPath && this.onAttackBuilding && this.checkBlocked) {
+        this.wallAttackTimer -= dt;
+        if (this.wallAttackTimer <= 0) {
+          this.wallAttackTimer = this.WALL_ATTACK_INTERVAL;
+          const { gx, gy } = worldToTile(this.sprite.x, this.sprite.y);
+          // Pick the cardinal neighbor closest to the core that is blocked
+          const neighbors: Array<[number, number]> = [
+            [gx - 1, gy], [gx + 1, gy], [gx, gy - 1], [gx, gy + 1],
+          ];
+          let bestGx = -1, bestGy = -1, bestDist = Infinity;
+          for (const [nx, ny] of neighbors) {
+            if (this.checkBlocked(nx, ny)) {
+              const d = Math.abs(nx - CORE_GX) + Math.abs(ny - CORE_GY);
+              if (d < bestDist) { bestDist = d; bestGx = nx; bestGy = ny; }
+            }
+          }
+          if (bestGx >= 0) {
+            this.onAttackBuilding(bestGx, bestGy, this.WALL_ATTACK_DAMAGE);
+          }
+        }
+      }
+      this.updateHpBar();
+      return;
+    }
+
+    // Check if the next tile in the path is now blocked (wall placed after pathfinding)
     const next = this.path[0];
+    const { gx: nextGx, gy: nextGy } = worldToTile(next.x, next.y);
+    if (this.checkBlocked?.(nextGx, nextGy)) {
+      // Smash that wall tile instead of moving
+      this.wallAttackTimer -= dt;
+      if (this.wallAttackTimer <= 0) {
+        this.wallAttackTimer = this.WALL_ATTACK_INTERVAL;
+        this.onAttackBuilding?.(nextGx, nextGy, this.WALL_ATTACK_DAMAGE);
+      }
+      this.updateHpBar();
+      return;
+    }
+
     const dx = next.x - this.sprite.x;
     const dy = next.y - this.sprite.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
