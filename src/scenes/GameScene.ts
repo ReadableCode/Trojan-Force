@@ -15,6 +15,7 @@ import { ENEMY_DEFS } from '../data/enemies';
 import { TOWER_DEFS, TowerDef } from '../data/towers';
 import { WAVE_DEFS } from '../data/waves';
 import { RESOURCE_PATCHES, ResourcePatch, CORE_POS } from '../data/mapData';
+import { RESEARCH_DEFS, ResearchDef } from '../data/research';
 
 // ── Tool descriptor ───────────────────────────────────────────────────────────
 interface ToolItem {
@@ -44,6 +45,7 @@ const ALL_TOOLS: ToolItem[] = [
   // Miners
   { key: 'drill',     label: 'Drill',       texture: 'drill',     cost: { iron: 20 },            category: 'miner'   as const, description: 'Place on a resource patch. Mines 2 resources/sec passively.' },
   { key: 'pumpDrill', label: 'Pump Drill',  texture: 'pumpDrill', cost: { iron: 10, copper: 10 }, category: 'miner'  as const, description: 'Faster drill — 4 resources/sec. Needs Copper to build.' },
+  { key: 'deepMiner', label: 'Deep Miner',  texture: 'deepMiner', cost: { iron: 40, crystal: 20 }, category: 'miner' as const, description: 'Unlocked by Deep Mining research. Mines 8 resources/sec.' },
   // Walls
   { key: 'wall',           label: 'Wall',     texture: 'wall',           cost: { iron: 5 },             category: 'wall' as const, description: 'Blocks enemy paths, 100 HP. Enemies will punch through over time.' },
   { key: 'reinforcedWall', label: 'Rei. Wall',texture: 'reinforcedWall', cost: { iron: 5, copper: 5 },  category: 'wall' as const, description: 'Tougher wall, 300 HP. Worth the Copper for key chokepoints.' },
@@ -105,16 +107,19 @@ export class GameScene extends Phaser.Scene {
   private drillEffMultiplier = 1;
   private turretRangeBonus = 0;
   private wallHpBonus = 0;
+  private cannonExtraSplash = 0;
+  private powerCostMult = 1;
+  private deepMinerUnlocked = false;
 
   // ── UI ────────────────────────────────────────────────────────────────────
   private selectedTool: ToolItem | null = null;
-  private toolButtons: Array<{
-    btn: Phaser.GameObjects.Image;
-    icon: Phaser.GameObjects.Image;
-    tool: ToolItem;
-    costText: Phaser.GameObjects.Text;
-  }> = [];
   private conveyorRotation = 0; // 0=right, 1=down, 2=left, 3=up
+
+  // Tabs
+  private activeTab = 'tower';
+  private tabButtons: Array<{ rect: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; key: string }> = [];
+  private rowObjects: Phaser.GameObjects.GameObject[] = []; // current tab's buttons, recreated on switch
+  private toolBtnRefs: Array<{ btn: Phaser.GameObjects.Image; tool: ToolItem }> = [];
 
   // ── Score ─────────────────────────────────────────────────────────────────
   private resourcesSpent = 0;
@@ -198,75 +203,262 @@ export class GameScene extends Phaser.Scene {
     return this.patchMap.get(tileKey(gx, gy));
   }
 
-  // ── Toolbar ───────────────────────────────────────────────────────────────
+  // ── Toolbar (tabbed) ───────────────────────────────────────────────────────
+  private static readonly TABS: Array<{ key: string; label: string }> = [
+    { key: 'tower',    label: 'TOWERS' },
+    { key: 'miner',    label: 'MINERS' },
+    { key: 'wall',     label: 'WALLS' },
+    { key: 'support',  label: 'SUPPORT' },
+    { key: 'research', label: 'RESEARCH' },
+    { key: 'delete',   label: 'DELETE' },
+  ];
+
   private createToolbar(): void {
     // Toolbar background
     this.add.rectangle(CANVAS_W / 2, TOOLBAR_Y + 84, CANVAS_W, 168, 0x060610).setDepth(8);
     this.add.rectangle(CANVAS_W / 2, TOOLBAR_Y + 1, CANVAS_W, 2, 0x2244aa).setDepth(8);
 
-    const btnW = 72, gap = 3;
-    const row1Tools = ALL_TOOLS.slice(0, 9);  // towers + miners
-    const row2Tools = ALL_TOOLS.slice(9);      // buildings + delete
+    // Tab strip
+    const tabs = GameScene.TABS;
+    const tabW = 150, tabGap = 6, tabH = 34;
+    const stripW = tabs.length * (tabW + tabGap) - tabGap;
+    const startX = (CANVAS_W - stripW) / 2;
+    const tabY = TOOLBAR_Y + 22;
 
-    const makeRow = (tools: ToolItem[], rowY: number) => {
-      const totalW = tools.length * (btnW + gap) - gap;
-      const startX = (CANVAS_W - totalW) / 2;
+    tabs.forEach((tab, i) => {
+      const tx = startX + i * (tabW + tabGap) + tabW / 2;
+      const rect = this.add.rectangle(tx, tabY, tabW, tabH, 0x141426).setDepth(9)
+        .setStrokeStyle(2, 0x2a3a6a).setInteractive({ useHandCursor: true });
+      const text = this.add.text(tx, tabY, tab.label, {
+        fontSize: '17px', fontFamily: 'monospace', color: '#8899bb', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(10);
 
-      tools.forEach((tool, i) => {
-        const bx = startX + i * (btnW + gap) + btnW / 2;
-        const by = rowY;
+      rect.on('pointerover', () => { if (this.activeTab !== tab.key) rect.setFillStyle(0x1e1e3a); });
+      rect.on('pointerout',  () => { if (this.activeTab !== tab.key) rect.setFillStyle(0x141426); });
+      rect.on('pointerdown', () => this.switchTab(tab.key));
 
-        const btn = this.add.image(bx, by, 'btn').setDepth(9)
-          .setDisplaySize(btnW, btnW)
-          .setInteractive({ useHandCursor: true });
-        const icon = this.add.image(bx, by - 12, tool.texture).setScale(0.9).setDepth(10);
+      this.tabButtons.push({ rect, text, key: tab.key });
+    });
 
-        // Cost label  (bottom of button)
-        const costStr = Object.entries(tool.cost)
-          .map(([k, v]) => `${v}${k[0].toUpperCase()}`)
-          .join(' ');
-        const costText = this.add.text(bx, by + 24, costStr, {
-          fontSize: '17px', fontFamily: 'monospace', color: '#99bbdd', align: 'center',
-        }).setOrigin(0.5, 0.5).setDepth(10);
+    this.switchTab('tower');
+  }
 
-        // Tool label (just below icon)
-        this.add.text(bx, by + 9, tool.label, {
-          fontSize: '16px', fontFamily: 'monospace', color: '#ccddee', align: 'center',
-          fontStyle: 'bold',
-        }).setOrigin(0.5, 0.5).setDepth(10);
+  private switchTab(key: string): void {
+    this.activeTab = key;
+    // Highlight active tab
+    for (const t of this.tabButtons) {
+      const active = t.key === key;
+      t.rect.setFillStyle(active ? 0x2a4a8a : 0x141426);
+      t.rect.setStrokeStyle(2, active ? 0x55aaff : 0x2a3a6a);
+      t.text.setColor(active ? '#ffffff' : '#8899bb');
+    }
+    if (key === 'research') {
+      this.renderResearchRow();
+    } else {
+      this.renderToolRow(key as ToolItem['category']);
+    }
+  }
 
-        btn.on('pointerover', () => {
-          if (this.selectedTool?.key !== tool.key) btn.setTexture('btn-hover');
-          EventBus.emit('show-tooltip', tool);
-        });
-        btn.on('pointerout', () => {
-          if (this.selectedTool?.key !== tool.key) btn.setTexture('btn');
-          EventBus.emit('hide-tooltip');
-        });
-        btn.on('pointerdown', () => this.selectTool(tool));
+  private clearRow(): void {
+    for (const o of this.rowObjects) o.destroy();
+    this.rowObjects = [];
+    this.toolBtnRefs = [];
+  }
 
-        this.toolButtons.push({ btn, icon, tool, costText });
+  private toolsFor(category: ToolItem['category']): ToolItem[] {
+    return ALL_TOOLS.filter(t => {
+      if (t.category !== category) return false;
+      if (t.key === 'deepMiner' && !this.deepMinerUnlocked) return false;
+      return true;
+    });
+  }
+
+  private renderToolRow(category: ToolItem['category']): void {
+    this.clearRow();
+    const tools = this.toolsFor(category);
+    const btnW = 84, gap = 8, rowY = TOOLBAR_Y + 108;
+    const totalW = tools.length * (btnW + gap) - gap;
+    const startX = (CANVAS_W - totalW) / 2;
+
+    tools.forEach((tool, i) => {
+      const bx = startX + i * (btnW + gap) + btnW / 2;
+      const by = rowY;
+      const selected = this.selectedTool?.key === tool.key;
+
+      const btn = this.add.image(bx, by, selected ? 'btn-sel' : 'btn').setDepth(9)
+        .setDisplaySize(btnW, btnW)
+        .setInteractive({ useHandCursor: true });
+      const icon = this.add.image(bx, by - 20, tool.texture).setScale(0.85).setDepth(10);
+
+      const label = this.add.text(bx, by + 8, tool.label, {
+        fontSize: '14px', fontFamily: 'monospace', color: '#ccddee', align: 'center',
+        fontStyle: 'bold', wordWrap: { width: btnW - 6 },
+      }).setOrigin(0.5, 0.5).setDepth(10);
+
+      const costStr = Object.entries(tool.cost)
+        .map(([k, v]) => `${v}${k[0].toUpperCase()}`)
+        .join(' ') || '—';
+      const costText = this.add.text(bx, by + 30, costStr, {
+        fontSize: '13px', fontFamily: 'monospace', color: '#88aacc', align: 'center',
+      }).setOrigin(0.5, 0.5).setDepth(10);
+
+      btn.on('pointerover', () => {
+        if (this.selectedTool?.key !== tool.key) btn.setTexture('btn-hover');
+        EventBus.emit('show-tooltip', tool);
       });
-    };
+      btn.on('pointerout', () => {
+        if (this.selectedTool?.key !== tool.key) btn.setTexture('btn');
+        EventBus.emit('hide-tooltip');
+      });
+      btn.on('pointerdown', () => this.selectTool(tool));
 
-    makeRow(row1Tools, TOOLBAR_Y + 42);
-    makeRow(row2Tools, TOOLBAR_Y + 122);
+      this.rowObjects.push(btn, icon, label, costText);
+      this.toolBtnRefs.push({ btn, tool });
+    });
+  }
 
-    // Section labels
-    this.add.text(6, TOOLBAR_Y + 12, 'TOWERS  &  MINERS', {
-      fontSize: '18px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
-    }).setOrigin(0, 0.5).setDepth(9);
-    this.add.text(6, TOOLBAR_Y + 92, 'BUILDINGS  &  TOOLS', {
-      fontSize: '18px', fontFamily: 'monospace', color: '#4466aa', fontStyle: 'bold',
-    }).setOrigin(0, 0.5).setDepth(9);
+  private renderResearchRow(): void {
+    this.clearRow();
+    this.selectTool(null);
+    const defs = Object.values(RESEARCH_DEFS);
+    const btnW = 110, gap = 6, rowY = TOOLBAR_Y + 104;
+    const totalW = defs.length * (btnW + gap) - gap;
+    const startX = (CANVAS_W - totalW) / 2;
+    const hasLab = this.hasResearchLab();
+
+    defs.forEach((def, i) => {
+      const bx = startX + i * (btnW + gap) + btnW / 2;
+      const by = rowY;
+      const done = this.researchDone.has(def.key);
+      const locked = !this.prereqsMet(def);
+
+      const fill = done ? 0x1a3a1a : locked ? 0x1a1a22 : 0x141426;
+      const stroke = done ? 0x44cc44 : locked ? 0x333344 : 0x6644aa;
+      const rect = this.add.rectangle(bx, by, btnW, 80, fill).setDepth(9)
+        .setStrokeStyle(2, stroke).setInteractive({ useHandCursor: true });
+
+      const nameColor = done ? '#88ff88' : locked ? '#555566' : '#ddccff';
+      const name = this.add.text(bx, by - 22, def.label, {
+        fontSize: '13px', fontFamily: 'monospace', color: nameColor, align: 'center',
+        fontStyle: 'bold', wordWrap: { width: btnW - 8 },
+      }).setOrigin(0.5, 0.5).setDepth(10);
+
+      const status = done ? '✓ OWNED'
+        : locked ? '🔒 LOCKED'
+        : `${def.cost.crystal} Crystal`;
+      const statusColor = done ? '#66cc66' : locked ? '#666677' : '#33cccc';
+      const cost = this.add.text(bx, by + 26, status, {
+        fontSize: '12px', fontFamily: 'monospace', color: statusColor, align: 'center',
+      }).setOrigin(0.5, 0.5).setDepth(10);
+
+      rect.on('pointerover', () => {
+        if (!done && !locked) rect.setFillStyle(0x22224a);
+        EventBus.emit('show-tooltip', { label: def.label, cost: def.cost, description: def.description });
+      });
+      rect.on('pointerout', () => {
+        if (!done && !locked) rect.setFillStyle(0x141426);
+        EventBus.emit('hide-tooltip');
+      });
+      rect.on('pointerdown', () => this.purchaseResearch(def));
+
+      this.rowObjects.push(rect, name, cost);
+    });
+
+    // Hint line
+    const hint = hasLab
+      ? 'Click a node to research it (spends Crystal). Effects apply instantly.'
+      : '⚠ Build a Research Lab (SUPPORT tab) to unlock research.';
+    const hintText = this.add.text(CANVAS_W / 2, TOOLBAR_Y + 154, hint, {
+      fontSize: '14px', fontFamily: 'monospace', color: hasLab ? '#7788aa' : '#ffaa44',
+    }).setOrigin(0.5).setDepth(10);
+    this.rowObjects.push(hintText);
   }
 
   private selectTool(tool: ToolItem | null): void {
     this.selectedTool = tool;
-    for (const { btn, tool: t } of this.toolButtons) {
+    for (const { btn, tool: t } of this.toolBtnRefs) {
       btn.setTexture(t.key === tool?.key ? 'btn-sel' : 'btn');
     }
     EventBus.emit('tool-selected', tool?.key ?? null);
+  }
+
+  // ── Research ────────────────────────────────────────────────────────────────
+  private hasResearchLab(): boolean {
+    for (const [, b] of this.buildings) {
+      if (b instanceof Building && b.type === 'researchLab' && b.alive) return true;
+    }
+    return false;
+  }
+
+  private prereqsMet(def: ResearchDef): boolean {
+    if (!def.requires) return true;
+    return def.requires.every(r => this.researchDone.has(r));
+  }
+
+  private purchaseResearch(def: ResearchDef): void {
+    if (this.researchDone.has(def.key)) return;
+    if (!this.hasResearchLab()) {
+      EventBus.emit('show-error', 'Build a Research Lab first!');
+      return;
+    }
+    if (!this.prereqsMet(def)) {
+      EventBus.emit('show-error', 'Requires prior research!');
+      return;
+    }
+    if (!this.resources.canAfford(def.cost)) {
+      EventBus.emit('show-error', 'Not enough Crystal!');
+      return;
+    }
+    this.resources.spend(def.cost);
+    this.resourcesSpent += def.cost.crystal;
+    this.researchDone.add(def.key);
+    this.applyResearch(def.key);
+    EventBus.emit('show-error', `Researched: ${def.label}`);
+    this.renderResearchRow(); // refresh owned/unlocked states
+  }
+
+  private applyResearch(key: string): void {
+    switch (key) {
+      case 'drillEff1':
+        this.drillEffMultiplier = 1.25;
+        this.refreshMinerBonus();
+        break;
+      case 'drillEff2':
+        this.drillEffMultiplier = 1.5;
+        this.refreshMinerBonus();
+        break;
+      case 'turretRange':
+        this.turretRangeBonus += 1;
+        for (const t of this.towers) t.addRangeBonus(1);
+        break;
+      case 'explosiveShells':
+        this.cannonExtraSplash = 0.75;
+        for (const t of this.towers) if (t.def.key === 'cannon') t.extraSplash = this.cannonExtraSplash;
+        break;
+      case 'powerGrid':
+        this.powerCostMult = 0.7;
+        for (const t of this.towers) t.powerCostMult = this.powerCostMult;
+        break;
+      case 'reinforcedWallsResearch':
+        this.wallHpBonus += 50;
+        for (const [, b] of this.buildings) {
+          if (b instanceof Building && (b.type === 'wall' || b.type === 'reinforcedWall')) {
+            b.maxHp += 50;
+            b.hp += 50;
+          }
+        }
+        break;
+      case 'deepMining':
+        this.deepMinerUnlocked = true;
+        break;
+      case 'autoConveyor':
+        // Flag only — conveyors already route to adjacent towers.
+        break;
+    }
+  }
+
+  private refreshMinerBonus(): void {
+    for (const m of this.miners) m.drillEffBonus = this.drillEffMultiplier;
   }
 
   // ── Input ─────────────────────────────────────────────────────────────────
@@ -371,6 +563,8 @@ export class GameScene extends Phaser.Scene {
       const def = TOWER_DEFS[tool.key] as TowerDef;
       const tower = new Tower(this, gx, gy, def, this.resources);
       if (this.turretRangeBonus > 0) tower.addRangeBonus(this.turretRangeBonus);
+      if (this.powerCostMult !== 1) tower.powerCostMult = this.powerCostMult;
+      if (def.key === 'cannon' && this.cannonExtraSplash > 0) tower.extraSplash = this.cannonExtraSplash;
       this.buildings.set(tileKey(gx, gy), tower);
       this.towers.push(tower);
     } else {
@@ -623,12 +817,20 @@ export class GameScene extends Phaser.Scene {
   private checkWaveComplete(): void {
     if (!this.waveComplete) return;
     if (this.enemies.length === 0 && this.spawnQueue.length === 0) {
+      // Despawn any projectiles still in flight — without enemies (and once the
+      // phase flips to 'build') they would otherwise freeze on screen forever.
+      this.clearProjectiles();
       if (this.waveNumber >= this.totalWaves) {
         this.triggerVictory();
       } else {
         this.startBuildPhase();
       }
     }
+  }
+
+  private clearProjectiles(): void {
+    for (const p of this.projectiles) p.destroy();
+    this.projectiles = [];
   }
 
   // ── Brute wall-attack ─────────────────────────────────────────────────────

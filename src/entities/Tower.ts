@@ -20,6 +20,10 @@ export class Tower {
   private resources: ResourceManager;
   private rangeBonus = 0;
 
+  // ── Research upgrade modifiers ──────────────────────────────────────────────
+  extraSplash = 0;      // Explosive Shells adds splash radius (tiles)
+  powerCostMult = 1;    // Power Grid reduces power cost per shot
+
   constructor(
     scene: Phaser.Scene,
     gx: number, gy: number,
@@ -95,6 +99,7 @@ export class Tower {
         }, t));
       }
     } else {
+      const splash = (this.def.splash ?? 0) + this.extraSplash;
       projectiles.push(new Projectile({
         scene: this.scene,
         x, y,
@@ -102,7 +107,7 @@ export class Tower {
         size: this.def.projectileSize,
         speed: 320,
         damage: this.def.damage,
-        splashRadius: this.def.splash,
+        splashRadius: splash > 0 ? splash : undefined,
         piercesArmor: this.def.piercesArmor,
         dot: this.def.dot ?? undefined,
       }, target));
@@ -141,14 +146,17 @@ export class Tower {
     return true;
   }
 
+  private powerCost(): number {
+    return Math.max(1, Math.ceil((this.def.powerPerShot ?? 1) * this.powerCostMult));
+  }
+
   private canFire(): boolean {
     if (this.def.ammoType) {
       const amt = this.def.ammoPerShot ?? 1;
       if (!this.resources.canAfford({ [this.def.ammoType]: amt })) return false;
     }
     if (this.def.usePower) {
-      const pwr = this.def.powerPerShot ?? 1;
-      if (this.resources.get('power') < pwr) return false;
+      if (this.resources.get('power') < this.powerCost()) return false;
     }
     return true;
   }
@@ -158,7 +166,7 @@ export class Tower {
       this.resources.spend({ [this.def.ammoType]: this.def.ammoPerShot ?? 1 });
     }
     if (this.def.usePower) {
-      this.resources.spend({ power: this.def.powerPerShot ?? 1 });
+      this.resources.spend({ power: this.powerCost() });
     }
   }
 
