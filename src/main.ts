@@ -13,11 +13,11 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: 'game',
   pixelArt: false,
   antialias: true,
+  roundPixels: true,
   scene: [BootScene, MenuScene, GameScene, UIScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    zoom: Phaser.Scale.MAX_ZOOM,
   },
 };
 
