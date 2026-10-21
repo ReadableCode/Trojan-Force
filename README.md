@@ -2,13 +2,13 @@
 
 A browser tower defense game with a small factory layer. You mine resources, spend them on towers, walls and support buildings, and hold off 20 waves of enemies that path toward your Core. Built with Phaser 3, TypeScript and Vite. It runs entirely in the browser with no backend and no image assets: every texture is drawn in code at startup.
 
-It exists as a compact, readable example of a resource-driven tower defense: towers that burn ammo and power from your stockpile, walls that reshape enemy paths, and a research tree that unlocks upgrades.
+It exists as a compact, readable example of a resource-driven tower defense: towers that burn ammo and power from your stockpile, conveyors that keep ammo towers reloaded, walls that reshape enemy paths, and a research tree that unlocks upgrades.
 
 ![Main menu](docs/screenshots/menu.png)
 
-![Build phase: turrets around the Core, toolbar on the Towers tab](docs/screenshots/build_phase.png)
+![Build phase: a conveyor feeding one Cannon, an Ammo Cache beside another, and the conveyor placement preview](docs/screenshots/build_phase.png)
 
-![Wave 2: Crawlers advancing on the Core, drills on two iron patches](docs/screenshots/wave.png)
+![Wave 2: Crawlers coming from the top while the Cannon magazine bars drain](docs/screenshots/wave.png)
 
 ---
 
@@ -73,7 +73,7 @@ You start with 150 Iron, 50 Copper and 30 Coal. Each resource patch holds a fini
 | Choose a category | Click a toolbar tab: Towers, Miners, Walls, Support, Research, Delete |
 | Place selected building | Left-click on grid (green highlight = valid tile) |
 | Sell building (50% refund) | Right-click on placed building, or the Delete tool |
-| Rotate conveyor | R |
+| Rotate conveyor (arrow shows facing) | R |
 | Deselect / cancel | Esc |
 
 Hovering a toolbar button shows its cost and description.
@@ -88,16 +88,25 @@ Hovering a toolbar button shows its cost and description.
 | Crystal | Crystal Sniper, Laser, Research Lab |
 | Power | Consumed per shot by Tesla and Laser towers |
 
-Ammo and Power are drawn from your shared stockpile, so a tower stops firing when its resource runs out.
+Power is drawn from your shared stockpile per shot, so Tesla and Laser stop firing when it runs out.
+
+### Ammo Logistics
+
+Cannons and Flame Towers fire from a magazine that holds about 5 seconds of fire, shown as the orange bar under the tower. Reloading buys rounds from the stockpile (Cannon: 2 Iron per round, Flame Tower: 1 Coal).
+
+- **Build phase:** every magazine reloads quickly.
+- **During a wave, no feed:** the tower reloads at half its fire rate, so it slows to half speed once the magazine is empty.
+- **Fed by a conveyor:** a conveyor next to the tower whose arrow points into it reloads it at full fire rate. Press R before placing to set the arrow.
+- **Ammo Cache next to the tower:** triples the magazine, so it lasts longer before slowing down.
 
 ### Towers
 
 | Tower | Cost | Range | Notes |
 |---|---|---|---|
 | Turret | 30 Iron | 4 tiles | Fast, cheap, general purpose |
-| Cannon | 50 Iron + 20 Copper | 5 tiles | Slow heavy shot, 1.5-tile splash; consumes 2 Iron ammo per shot |
+| Cannon | 50 Iron + 20 Copper | 5 tiles | Slow heavy shot, 1.5-tile splash; 2 Iron per round of ammo |
 | Tesla | 60 Copper | 3 tiles | Chains to 3 targets; consumes 5 Power per shot |
-| Flame Tower | 40 Iron + 30 Coal | 2 tiles | Rapid fire + burn DOT; consumes 1 Coal ammo per shot |
+| Flame Tower | 40 Iron + 30 Coal | 2 tiles | Rapid fire + burn DOT; 1 Coal per round of ammo |
 | Crystal Sniper | 20 Iron + 40 Crystal | 9 tiles | Very high single-shot damage, slow fire rate |
 | Laser | 50 Copper + 30 Crystal | 6 tiles | Pierces armor; consumes 2 Power per shot |
 
@@ -110,8 +119,8 @@ Ammo and Power are drawn from your shared stockpile, so a tower stops firing whe
 | Deep Miner | 40 Iron + 20 Crystal | 8 units/sec; appears after Deep Mining research |
 | Wall | 5 Iron | 100 HP; blocks ground paths, enemies reroute or break through |
 | Reinforced Wall | 5 Iron + 5 Copper | 300 HP |
-| Conveyor | 3 Iron | Rotates with R |
-| Ammo Cache | 10 Iron | Ammo buffer building |
+| Conveyor | 3 Iron | Full-speed reloads for the ammo tower its arrow points into; rotate with R |
+| Ammo Cache | 10 Iron | Triples the magazine of adjacent ammo towers |
 | Power Plant | 30 Iron + 20 Coal | +50 Power capacity; 50 Power/sec while burning 1 Coal/sec |
 | Solar Panel | 20 Copper + 10 Crystal | +20 Power capacity; 20 Power/sec, no fuel |
 | Research Lab | 40 Iron + 20 Crystal | Required to buy research |
@@ -131,7 +140,7 @@ With a Research Lab built, open the Research tab and spend Crystal. Effects appl
 | Power Grid | 40 | Tesla/Laser power cost -30% |
 | Reinforced Walls | 25 | Walls gain +50 HP |
 | Deep Mining | 80 | Unlocks Deep Miner (needs Drill Efficiency II) |
-| Auto-Conveyor | 60 | Recorded as owned; no gameplay effect yet |
+| Auto-Conveyor | 60 | Conveyors feed every adjacent ammo tower, whichever way they face |
 
 ### Enemies
 
@@ -150,7 +159,8 @@ With a Research Lab built, open the Research tab and spend Crystal. Effects appl
 ## How It Works
 
 - **Scenes.** `BootScene` draws all textures with Phaser graphics, then hands off to `MenuScene`. Starting a game runs `GameScene` (grid, entities, waves, build/fight phases) with `UIScene` overlaid as the HUD.
-- **Events.** Scenes talk through a shared `EventBus` (resources changed, phase changed, wave started, Core hit, tooltips, game over).
+- **Events.** Scenes talk through a small shared `EventBus` (resources changed, phase changed, wave started, Core hit, tooltips, game over). `UIScene` removes its handlers when it shuts down, so Play Again starts clean.
+- **Ammo.** Each frame `GameScene` checks the four neighbours of every ammo tower for a conveyor pointing in and for an Ammo Cache, then calls `Tower.reload` with the matching rate and magazine size.
 - **Pathing.** `Pathfinder` runs BFS over the 32x16 grid from each spawn tile to the Core. Placing or losing a wall reroutes ground enemies. Flyers and Burrowers path straight through. If walls block every route, ground enemies take the direct route and attack the walls in the way.
 - **Data-driven balance.** Stats for towers, enemies, buildings, waves, research and the map live in `src/data/`, so tuning is a matter of editing those tables.
 
@@ -161,8 +171,8 @@ With a Research Lab built, open the Research tab and spend Crystal. Effects appl
 ```
 src/
 ├── main.ts              Entry point: creates the Phaser game and registers scenes
-├── constants.ts         Tile size, canvas dimensions, core HP, build-phase timer
-├── EventBus.ts          Global Phaser EventEmitter shared between scenes
+├── constants.ts         Tile size, canvas dimensions, core HP, build-phase timer, ammo tuning
+├── EventBus.ts          Minimal event bus shared between scenes
 ├── Pathfinder.ts        BFS grid pathfinder for enemy routing
 ├── ResourceManager.ts   Resource store: balances, rates, add/spend helpers
 ├── data/
@@ -174,14 +184,14 @@ src/
 │   └── research.ts      Research tree node definitions and unlock effects
 ├── entities/
 │   ├── Enemy.ts         Enemy sprite: movement, pathfinding, damage, death
-│   ├── Tower.ts         Tower sprite: targeting, shooting, ammo consumption
-│   ├── Building.ts      Placeable building sprite (walls, miners, support)
+│   ├── Tower.ts         Tower sprite: targeting, shooting, ammo magazine and reload
+│   ├── Building.ts      Placeable building sprite (walls, miners, support, conveyor facing)
 │   └── Projectile.ts    Projectile sprite: travel, hit detection, splash
 └── scenes/
     ├── BootScene.ts     Generates textures in code, then starts the menu
     ├── MenuScene.ts     Main menu
     ├── GameScene.ts     Core gameplay: grid, entities, waves, build/fight phases, tabbed toolbar, research
-    └── UIScene.ts       HUD overlay: resource bars, wave counter, tooltips, game over screen
+    └── UIScene.ts       HUD overlay: Core HP, resources, wave counter, tooltips, game over screen
 ```
 
 ---

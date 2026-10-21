@@ -29,12 +29,14 @@ const BUILDING_CONFIGS: Record<BuildingType, BuildingConfig> = {
 
 export class Building {
   sprite: Phaser.GameObjects.Rectangle;
+  icon?: Phaser.GameObjects.Image;
   hpBar?: Phaser.GameObjects.Rectangle;
   hpBarBg?: Phaser.GameObjects.Rectangle;
 
   readonly gx: number;
   readonly gy: number;
   readonly type: BuildingType;
+  readonly rotation: number;   // conveyor facing, index into DIRECTIONS
 
   hp: number;
   maxHp: number;
@@ -53,11 +55,13 @@ export class Building {
     gx: number, gy: number,
     type: BuildingType,
     resourceType = '',
+    rotation = 0,
   ) {
     this.gx = gx;
     this.gy = gy;
     this.type = type;
     this.resourceType = resourceType;
+    this.rotation = rotation;
     this.cfg = BUILDING_CONFIGS[type];
     this.maxHp = this.cfg.hp;
     this.hp = this.maxHp;
@@ -66,6 +70,10 @@ export class Building {
 
     this.sprite = scene.add.rectangle(x, y, TILE_SIZE - 2, TILE_SIZE - 2, this.cfg.color);
     this.sprite.setDepth(2);
+
+    if (type === 'conveyor') {
+      this.icon = scene.add.image(x, y, 'conveyor').setDepth(3).setRotation(rotation * Math.PI / 2);
+    }
 
     if (type !== 'wall' && type !== 'reinforcedWall' && type !== 'conveyor') {
       this.hpBarBg = scene.add.rectangle(x, y - 18, 24, 3, 0x330000);
@@ -160,6 +168,7 @@ export class Building {
 
   destroy(): void {
     if (this.sprite?.active) this.sprite.destroy();
+    if (this.icon?.active) this.icon.destroy();
     if (this.hpBar?.active) this.hpBar.destroy();
     if (this.hpBarBg?.active) this.hpBarBg.destroy();
     this.alive = false;

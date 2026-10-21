@@ -40,22 +40,30 @@ export class UIScene extends Phaser.Scene {
       fontSize: '16px', fontFamily: MONO, color: '#ffbb00', fontStyle: 'bold',
     });
 
-    // Resources — two rows of compact info:  LABEL\nVALUE
-    // Row starts at x=160 to clear the game name
+    // Core HP (left column, under the game name)
+    this.add.text(10, 36, '❤ CORE', {
+      fontSize: '17px', fontFamily: MONO, color: '#ffee55',
+    });
+    this.coreHpText = this.add.text(10, 60, `${CORE_HP}/${CORE_HP}`, {
+      fontSize: '32px', fontFamily: MONO, color: '#ffee55', fontStyle: 'bold',
+      stroke: '#553300', strokeThickness: 3,
+    });
+
+    // Resources — one column each:  LABEL over VALUE
     const RES: Array<{ key: string; label: string; color: string; x: number }> = [
       { key: 'iron',    label: '⬜ IRON',    color: '#bbbbbb', x: 175 },
-      { key: 'copper',  label: '🟠 COPPER',  color: '#dd8833', x: 310 },
-      { key: 'coal',    label: '⬛ COAL',    color: '#999999', x: 445 },
-      { key: 'crystal', label: '🔷 CRYSTAL', color: '#33cccc', x: 575 },
-      { key: 'power',   label: '⚡ POWER',   color: '#88bbff', x: 720 },
+      { key: 'copper',  label: '🟠 COPPER',  color: '#dd8833', x: 300 },
+      { key: 'coal',    label: '⬛ COAL',    color: '#999999', x: 425 },
+      { key: 'crystal', label: '🔷 CRYSTAL', color: '#33cccc', x: 550 },
+      { key: 'power',   label: '⚡ POWER',   color: '#88bbff', x: 675 },
     ];
 
     for (const r of RES) {
       this.add.text(r.x, 8, r.label, {
         fontSize: '17px', fontFamily: MONO, color: r.color,
       });
-      this.resTexts[r.key] = this.add.text(r.x, 52, '0', {
-        fontSize: '42px', fontFamily: MONO, color: r.color, fontStyle: 'bold',
+      this.resTexts[r.key] = this.add.text(r.x, 48, '0', {
+        fontSize: '38px', fontFamily: MONO, color: r.color, fontStyle: 'bold',
       });
     }
 
@@ -69,12 +77,6 @@ export class UIScene extends Phaser.Scene {
     }).setOrigin(1, 0);
 
     this.timerText.setStroke('#002200', 3);
-
-    // Core HP (centre)
-    this.coreHpText = this.add.text(CANVAS_W / 2, 72, `❤ CORE  ${CORE_HP}/${CORE_HP}`, {
-      fontSize: '26px', fontFamily: MONO, color: '#ffee55', fontStyle: 'bold',
-      stroke: '#553300', strokeThickness: 3,
-    }).setOrigin(0.5, 0);
 
     // Error flash (below HUD)
     this.errorText = this.add.text(CANVAS_W / 2, GRID_OFFSET_Y + 36, '', {
@@ -126,8 +128,15 @@ export class UIScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(20).setAlpha(0);
   }
 
+  // EventBus outlives the scene, so drop this scene's handlers when it shuts
+  // down; otherwise Play Again leaves stale handlers writing to destroyed text.
+  private listen(event: string, handler: (...args: unknown[]) => void): void {
+    EventBus.on(event, handler);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => EventBus.off(event, handler));
+  }
+
   private bindEvents(): void {
-    EventBus.on('resources-changed', (inv: unknown) => {
+    this.listen('resources-changed', (inv: unknown) => {
       const i = inv as Inventory;
       this.resTexts['iron'].setText(String(Math.floor(i.iron)));
       this.resTexts['copper'].setText(String(Math.floor(i.copper)));
@@ -136,7 +145,7 @@ export class UIScene extends Phaser.Scene {
       this.resTexts['power'].setText(`${Math.floor(i.power)}/${i.maxPower}`);
     });
 
-    EventBus.on('phase-changed', (phase: unknown, wave: unknown, total: unknown, timer: unknown) => {
+    this.listen('phase-changed', (phase: unknown, wave: unknown, total: unknown, timer: unknown) => {
       const p = phase as string, w = wave as number, t = total as number, s = timer as number;
       this.waveText.setText(`Wave ${w} / ${t}`);
       if (p === 'build') {
@@ -147,26 +156,26 @@ export class UIScene extends Phaser.Scene {
       }
     });
 
-    EventBus.on('build-timer', (secs: unknown) => {
+    this.listen('build-timer', (secs: unknown) => {
       const s = secs as number;
       const color = s > 15 ? '#44ff88' : s > 7 ? '#ffcc00' : '#ff4444';
       this.timerText.setColor(color).setText(`BUILD  ${s}s`);
     });
 
-    EventBus.on('wave-started', (wave: unknown, edge: unknown) => {
+    this.listen('wave-started', (wave: unknown, edge: unknown) => {
       const e = (edge as string).toUpperCase();
       this.announce(`⚔ Wave ${wave} — from ${e}!`);
     });
 
-    EventBus.on('core-hit', (hp: unknown, maxHp: unknown) => {
+    this.listen('core-hit', (hp: unknown, maxHp: unknown) => {
       const cur = Math.max(0, hp as number);
       const max = maxHp as number;
       const ratio = cur / max;
       const color = ratio > 0.5 ? '#ffee55' : ratio > 0.25 ? '#ff8800' : '#ff2222';
-      this.coreHpText.setColor(color).setText(`❤ CORE  ${cur}/${max}`);
+      this.coreHpText.setColor(color).setText(`${cur}/${max}`);
     });
 
-    EventBus.on('show-tooltip', (tool: unknown) => {
+    this.listen('show-tooltip', (tool: unknown) => {
       const t = tool as { label: string; cost: Record<string, number>; description?: string };
       const costStr = Object.entries(t.cost).map(([k, v]) => `${v} ${k}`).join('  ') || 'Free';
       const lines = [t.label, `Cost: ${costStr}`];
@@ -179,22 +188,22 @@ export class UIScene extends Phaser.Scene {
       this.input.on('pointermove', this.moveTooltip, this);
     });
 
-    EventBus.on('hide-tooltip', () => {
+    this.listen('hide-tooltip', () => {
       this.tooltipBg.setVisible(false);
       this.tooltipText.setVisible(false);
       this.input.off('pointermove', this.moveTooltip, this);
     });
 
-    EventBus.on('show-error', (msg: unknown) => {
+    this.listen('show-error', (msg: unknown) => {
       this.errorText.setText(msg as string).setAlpha(1);
       this.tweens.add({ targets: this.errorText, alpha: 0, duration: 1500, delay: 500 });
     });
 
-    EventBus.on('game-over', (wave: unknown, score: unknown) => {
+    this.listen('game-over', (wave: unknown, score: unknown) => {
       this.showOverlay('GAME OVER', `Survived ${wave} waves\nScore: ${score}`, false);
     });
 
-    EventBus.on('victory', (wave: unknown, score: unknown) => {
+    this.listen('victory', (wave: unknown, score: unknown) => {
       this.showOverlay('VICTORY!', `All ${wave} waves defeated!\nScore: ${score}`, true);
     });
   }
