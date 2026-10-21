@@ -31,13 +31,13 @@ export const SUPPORT_DEFS: Record<string, BuildingDef> = {
     key: 'conveyor', label: 'Conveyor',
     cost: { iron: 3 }, hp: 50,
     color: 0x885500,
-    description: 'Routes ammo to nearby towers',
+    description: 'Feeds ammo to the tower it points at',
   },
   ammoCache: {
     key: 'ammoCache', label: 'Ammo Cache',
     cost: { iron: 10 }, hp: 80,
     color: 0x556677,
-    description: 'Buffers ammo to prevent tower starvation',
+    description: 'Triples the ammo magazine of adjacent towers',
   },
   coalPowerPlant: {
     key: 'coalPowerPlant', label: 'Power Plant',
@@ -78,7 +78,7 @@ export const MINER_DEFS: Record<string, MinerDef> = {
   },
   deepMiner: {
     key: 'deepMiner', label: 'Deep Miner',
-    cost: { iron: 30, crystal: 20 }, hp: 150,
+    cost: { iron: 40, crystal: 20 }, hp: 150,
     color: 0x88dd00,
     outputRate: 8,
     requiresResource: true,

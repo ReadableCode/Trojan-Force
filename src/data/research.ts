@@ -21,12 +21,12 @@ export const RESEARCH_DEFS: Record<string, ResearchDef> = {
   turretRange: {
     key: 'turretRange', label: 'Turret Range',
     cost: { crystal: 30 },
-    description: 'All turrets +1 range',
+    description: 'All towers +1 range',
   },
   explosiveShells: {
     key: 'explosiveShells', label: 'Explosive Shells',
     cost: { crystal: 50 },
-    description: 'Cannon shells splash on impact',
+    description: 'Cannon splash radius +0.75 tiles',
   },
   powerGrid: {
     key: 'powerGrid', label: 'Power Grid',
@@ -47,6 +47,6 @@ export const RESEARCH_DEFS: Record<string, ResearchDef> = {
   autoConveyor: {
     key: 'autoConveyor', label: 'Auto-Conveyor',
     cost: { crystal: 60 },
-    description: 'Conveyors self-route to nearest hungry tower',
+    description: 'Conveyors feed every adjacent tower, whichever way they face',
   },
 };

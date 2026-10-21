@@ -9,13 +9,26 @@ export const CANVAS_H = 792;
 
 export const HUD_H = GRID_OFFSET_Y;
 export const GRID_H = GRID_ROWS * TILE_SIZE; // 512
-export const TOOLBAR_Y = GRID_OFFSET_Y + GRID_H; // 602
+export const TOOLBAR_Y = GRID_OFFSET_Y + GRID_H; // 624
 export const TOOLBAR_H = CANVAS_H - TOOLBAR_Y; // 168
 
 export const CORE_HP = 200;
 export const BUILD_PHASE_SECS = 45;
 
 export const PROJECTILE_SPEED = 320;
+
+// Ammo logistics for towers with an ammoType (Cannon, Flame Tower).
+// Magazine holds this many seconds of continuous fire.
+export const MAGAZINE_SECS = 5;
+// An adjacent Ammo Cache multiplies magazine size.
+export const AMMO_CACHE_MAG_MULT = 3;
+// Reload speed as a fraction of fire rate.
+export const RELOAD_UNFED = 0.5;   // no conveyor feeding the tower
+export const RELOAD_FED = 1;       // a conveyor points into the tower
+export const RELOAD_BUILD = 4;     // any tower during the build phase
+
+// Facing for rotation index 0..3: right, down, left, up.
+export const DIRECTIONS: ReadonlyArray<readonly [number, number]> = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 
 export function tileToWorld(gx: number, gy: number): { x: number; y: number } {
   return {

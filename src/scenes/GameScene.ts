@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   TILE_SIZE, GRID_COLS, GRID_ROWS, GRID_OFFSET_X, GRID_OFFSET_Y,
   CANVAS_W, TOOLBAR_Y, CORE_HP, BUILD_PHASE_SECS,
+  AMMO_CACHE_MAG_MULT, RELOAD_UNFED, RELOAD_FED, RELOAD_BUILD, DIRECTIONS,
   tileToWorld, worldToTile, isValidTile, tileKey,
 } from '../constants';
 import { EventBus } from '../EventBus';
@@ -16,6 +17,7 @@ import { TOWER_DEFS, TowerDef } from '../data/towers';
 import { WAVE_DEFS } from '../data/waves';
 import { RESOURCE_PATCHES, ResourcePatch, CORE_POS } from '../data/mapData';
 import { RESEARCH_DEFS, ResearchDef } from '../data/research';
+import { WALL_DEFS, SUPPORT_DEFS, MINER_DEFS } from '../data/buildings';
 
 // ── Tool descriptor ───────────────────────────────────────────────────────────
 interface ToolItem {
@@ -29,9 +31,9 @@ interface ToolItem {
 
 const TOWER_DESCRIPTIONS: Record<string, string> = {
   turret:        'Basic single-target fire. No ammo needed. Reliable all-rounder.',
-  cannon:        'Splash damage (1.5 tile radius). Consumes 2 Iron/shot. Excellent vs groups.',
+  cannon:        'Splash damage (1.5 tile radius). 2 Iron/shot. Reloads at half speed unless a conveyor feeds it.',
   tesla:         'Chain lightning hits up to 3 enemies. Needs Power (5/shot).',
-  flameTower:    'Burns Coal as fuel. Applies fire DoT. Great in tight corridors.',
+  flameTower:    'Burns 1 Coal/shot. Applies fire DoT. Reloads at half speed unless a conveyor feeds it.',
   crystalSniper: '9-tile range. Very slow but enormous single-target damage.',
   laser:         'Pierces enemy armor. Needs Power (2/shot). Best vs Armored Tanks.',
 };
@@ -43,18 +45,18 @@ const ALL_TOOLS: ToolItem[] = [
     description: TOWER_DESCRIPTIONS[d.key] ?? '',
   })),
   // Miners
-  { key: 'drill',     label: 'Drill',       texture: 'drill',     cost: { iron: 20 },            category: 'miner'   as const, description: 'Place on a resource patch. Mines 2 resources/sec passively.' },
-  { key: 'pumpDrill', label: 'Pump Drill',  texture: 'pumpDrill', cost: { iron: 10, copper: 10 }, category: 'miner'  as const, description: 'Faster drill — 4 resources/sec. Needs Copper to build.' },
-  { key: 'deepMiner', label: 'Deep Miner',  texture: 'deepMiner', cost: { iron: 40, crystal: 20 }, category: 'miner' as const, description: 'Unlocked by Deep Mining research. Mines 8 resources/sec.' },
+  { key: 'drill',     label: 'Drill',       texture: 'drill',     cost: MINER_DEFS.drill.cost,     category: 'miner'   as const, description: 'Place on a resource patch. Mines 2 resources/sec passively.' },
+  { key: 'pumpDrill', label: 'Pump Drill',  texture: 'pumpDrill', cost: MINER_DEFS.pumpDrill.cost, category: 'miner'   as const, description: 'Faster drill — 4 resources/sec. Needs Copper to build.' },
+  { key: 'deepMiner', label: 'Deep Miner',  texture: 'deepMiner', cost: MINER_DEFS.deepMiner.cost, category: 'miner'   as const, description: 'Unlocked by Deep Mining research. Mines 8 resources/sec.' },
   // Walls
-  { key: 'wall',           label: 'Wall',     texture: 'wall',           cost: { iron: 5 },             category: 'wall' as const, description: 'Blocks enemy paths, 100 HP. Enemies will punch through over time.' },
-  { key: 'reinforcedWall', label: 'Rei. Wall',texture: 'reinforcedWall', cost: { iron: 5, copper: 5 },  category: 'wall' as const, description: 'Tougher wall, 300 HP. Worth the Copper for key chokepoints.' },
+  { key: 'wall',           label: 'Wall',     texture: 'wall',           cost: WALL_DEFS.wall.cost,           category: 'wall' as const, description: 'Blocks enemy paths, 100 HP. Enemies will punch through over time.' },
+  { key: 'reinforcedWall', label: 'Rei. Wall',texture: 'reinforcedWall', cost: WALL_DEFS.reinforcedWall.cost, category: 'wall' as const, description: 'Tougher wall, 300 HP. Worth the Copper for key chokepoints.' },
   // Support
-  { key: 'conveyor',       label: 'Conveyor', texture: 'conveyor',       cost: { iron: 3 },             category: 'support' as const, description: 'Routes ammo to adjacent towers. Press R to rotate direction.' },
-  { key: 'ammoCache',      label: 'Ammo Cache',texture: 'ammoCache',     cost: { iron: 10 },            category: 'support' as const, description: 'Buffers ammo near a tower so it never starves mid-wave.' },
-  { key: 'coalPowerPlant', label: 'Power Plant',texture: 'coalPowerPlant',cost: { iron: 30, coal: 20 }, category: 'support' as const, description: 'Generates 50 Power/sec. Burns 1 Coal/sec as fuel.' },
-  { key: 'solarPanel',     label: 'Solar',    texture: 'solarPanel',     cost: { copper: 20, crystal: 10 }, category: 'support' as const, description: 'Generates 20 Power/sec. Free fuel — just needs Copper + Crystal.' },
-  { key: 'researchLab',    label: 'Lab',      texture: 'researchLab',    cost: { iron: 40, crystal: 20 }, category: 'support' as const, description: 'Converts Crystal into permanent upgrades. Queue one item at a time.' },
+  { key: 'conveyor',       label: 'Conveyor', texture: 'conveyor',       cost: SUPPORT_DEFS.conveyor.cost,       category: 'support' as const, description: 'Point it into a Cannon or Flame Tower for full-speed reloads. Press R to rotate.' },
+  { key: 'ammoCache',      label: 'Ammo Cache',texture: 'ammoCache',     cost: SUPPORT_DEFS.ammoCache.cost,      category: 'support' as const, description: 'Triples the magazine of adjacent Cannons and Flame Towers so they last a wave.' },
+  { key: 'coalPowerPlant', label: 'Power Plant',texture: 'coalPowerPlant',cost: SUPPORT_DEFS.coalPowerPlant.cost, category: 'support' as const, description: 'Generates 50 Power/sec. Burns 1 Coal/sec as fuel.' },
+  { key: 'solarPanel',     label: 'Solar',    texture: 'solarPanel',     cost: SUPPORT_DEFS.solarPanel.cost,     category: 'support' as const, description: 'Generates 20 Power/sec. Free fuel — just needs Copper + Crystal.' },
+  { key: 'researchLab',    label: 'Lab',      texture: 'researchLab',    cost: SUPPORT_DEFS.researchLab.cost,    category: 'support' as const, description: 'Converts Crystal into permanent upgrades. Queue one item at a time.' },
   // Delete
   { key: 'delete', label: 'Delete', texture: 'btn', cost: {}, category: 'delete' as const, description: 'Click any building to sell it for 50% of its resource cost.' },
 ];
@@ -77,54 +79,91 @@ export class GameScene extends Phaser.Scene {
   // ── Grid state ────────────────────────────────────────────────────────────
   private gridGfx!: Phaser.GameObjects.Graphics;
   private highlightGfx!: Phaser.GameObjects.Graphics;
-  private patches: PatchState[] = [];
-  private patchMap = new Map<string, PatchState>(); // tileKey -> patch
+  private patches!: PatchState[];
+  private patchMap!: Map<string, PatchState>; // tileKey -> patch
 
   // ── Core ──────────────────────────────────────────────────────────────────
   private coreSprite!: Phaser.GameObjects.Image;
   private coreHpBar!: Phaser.GameObjects.Rectangle;
   private coreHpBarBg!: Phaser.GameObjects.Rectangle;
-  private coreHp = CORE_HP;
+  private coreHp!: number;
 
   // ── Entities ──────────────────────────────────────────────────────────────
-  private buildings = new Map<string, Building | Tower>();
-  private towers: Tower[] = [];
-  private miners: Building[] = [];
-  private enemies: Enemy[] = [];
-  private projectiles: Projectile[] = [];
+  private buildings!: Map<string, Building | Tower>;
+  private towers!: Tower[];
+  private miners!: Building[];
+  private enemies!: Enemy[];
+  private projectiles!: Projectile[];
 
   // ── Wave / phase state ────────────────────────────────────────────────────
-  private phase: GamePhase = 'build';
-  private waveNumber = 0;
+  private phase!: GamePhase;
+  private waveNumber!: number;
   private totalWaves = 20;
-  private buildTimer = BUILD_PHASE_SECS;
-  private spawnQueue: Array<{ type: string; timer: number }> = [];
-  private waveComplete = false;
+  private buildTimer!: number;
+  private spawnQueue!: Array<{ type: string; timer: number }>;
+  private waveComplete!: boolean;
   private buildTimerEvent?: Phaser.Time.TimerEvent;
 
   // ── Research / upgrades ───────────────────────────────────────────────────
-  private researchDone = new Set<string>();
-  private drillEffMultiplier = 1;
-  private turretRangeBonus = 0;
-  private wallHpBonus = 0;
-  private cannonExtraSplash = 0;
-  private powerCostMult = 1;
-  private deepMinerUnlocked = false;
+  private researchDone!: Set<string>;
+  private drillEffMultiplier!: number;
+  private turretRangeBonus!: number;
+  private wallHpBonus!: number;
+  private cannonExtraSplash!: number;
+  private powerCostMult!: number;
+  private deepMinerUnlocked!: boolean;
+  private autoConveyor!: boolean;
 
   // ── UI ────────────────────────────────────────────────────────────────────
-  private selectedTool: ToolItem | null = null;
-  private conveyorRotation = 0; // 0=right, 1=down, 2=left, 3=up
+  private selectedTool!: ToolItem | null;
+  private conveyorRotation!: number; // index into DIRECTIONS: 0=right, 1=down, 2=left, 3=up
 
   // Tabs
-  private activeTab = 'tower';
-  private tabButtons: Array<{ rect: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; key: string }> = [];
-  private rowObjects: Phaser.GameObjects.GameObject[] = []; // current tab's buttons, recreated on switch
-  private toolBtnRefs: Array<{ btn: Phaser.GameObjects.Image; tool: ToolItem }> = [];
+  private activeTab!: string;
+  private tabButtons!: Array<{ rect: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; key: string }>;
+  private rowObjects!: Phaser.GameObjects.GameObject[]; // current tab's buttons, recreated on switch
+  private toolBtnRefs!: Array<{ btn: Phaser.GameObjects.Image; tool: ToolItem }>;
 
   // ── Score ─────────────────────────────────────────────────────────────────
-  private resourcesSpent = 0;
+  private resourcesSpent!: number;
 
   constructor() { super({ key: 'Game' }); }
+
+  // Phaser reuses this instance on Play Again, so every per-game field is
+  // reset here rather than in field initializers (which run only once).
+  init(): void {
+    this.patches = [];
+    this.patchMap = new Map();
+    this.coreHp = CORE_HP;
+    this.buildings = new Map();
+    this.towers = [];
+    this.miners = [];
+    this.enemies = [];
+    this.projectiles = [];
+    this.phase = 'build';
+    this.waveNumber = 0;
+    this.buildTimer = BUILD_PHASE_SECS;
+    this.spawnQueue = [];
+    this.waveComplete = false;
+    this.buildTimerEvent = undefined;
+    this.researchDone = new Set();
+    this.drillEffMultiplier = 1;
+    this.turretRangeBonus = 0;
+    this.wallHpBonus = 0;
+    this.cannonExtraSplash = 0;
+    this.powerCostMult = 1;
+    this.deepMinerUnlocked = false;
+    this.autoConveyor = false;
+    this.selectedTool = null;
+    this.conveyorRotation = 0;
+    this.activeTab = 'tower';
+    this.tabButtons = [];
+    this.rowObjects = [];
+    this.toolBtnRefs = [];
+    this.resourcesSpent = 0;
+    this.currentHpScale = 1;
+    this.currentSpawnEdge = 'top';
+  }
 
   create(): void {
     this.resources = new ResourceManager();
@@ -452,7 +491,7 @@ export class GameScene extends Phaser.Scene {
         this.deepMinerUnlocked = true;
         break;
       case 'autoConveyor':
-        // Flag only — conveyors already route to adjacent towers.
+        this.autoConveyor = true;
         break;
     }
   }
@@ -477,6 +516,8 @@ export class GameScene extends Phaser.Scene {
 
     this.input.keyboard?.on('keydown-R', () => {
       this.conveyorRotation = (this.conveyorRotation + 1) % 4;
+      const ptr = this.input.activePointer;
+      this.updateHighlight(ptr.x, ptr.y);
     });
 
     this.input.keyboard?.on('keydown-ESC', () => {
@@ -502,6 +543,18 @@ export class GameScene extends Phaser.Scene {
     const py = GRID_OFFSET_Y + gy * TILE_SIZE;
     this.highlightGfx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
     this.highlightGfx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+
+    // Conveyor preview: arrow showing the facing that R rotates
+    if (this.selectedTool.key === 'conveyor') {
+      const [dx, dy] = DIRECTIONS[this.conveyorRotation];
+      const cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
+      this.highlightGfx.fillStyle(0xffcc44, 0.9);
+      this.highlightGfx.fillTriangle(
+        cx + dx * 11, cy + dy * 11,
+        cx - dx * 6 - dy * 8, cy - dy * 6 + dx * 8,
+        cx - dx * 6 + dy * 8, cy - dy * 6 - dx * 8,
+      );
+    }
   }
 
   private handleLeftClick(wx: number, wy: number): void {
@@ -571,7 +624,8 @@ export class GameScene extends Phaser.Scene {
       const btype = tool.key as BuildingType;
       const patch = this.getPatchAt(gx, gy);
       const resourceType = patch?.def.type ?? '';
-      const bld = new Building(this, gx, gy, btype, resourceType);
+      const rotation = btype === 'conveyor' ? this.conveyorRotation : 0;
+      const bld = new Building(this, gx, gy, btype, resourceType, rotation);
 
       if (btype === 'wall' || btype === 'reinforcedWall') {
         bld.maxHp += this.wallHpBonus;
@@ -631,6 +685,31 @@ export class GameScene extends Phaser.Scene {
 
     entity.destroy();
     this.buildings.delete(k);
+  }
+
+  // ── Ammo logistics ────────────────────────────────────────────────────────
+  /** Whether a conveyor feeds this tower and whether an Ammo Cache sits next to it. */
+  private ammoSupply(tower: Tower): { fed: boolean; cached: boolean } {
+    let fed = false, cached = false;
+    for (const [dx, dy] of DIRECTIONS) {
+      const b = this.buildings.get(tileKey(tower.gx + dx, tower.gy + dy));
+      if (!(b instanceof Building) || !b.alive) continue;
+      if (b.type === 'ammoCache') cached = true;
+      if (b.type === 'conveyor') {
+        const [fx, fy] = DIRECTIONS[b.rotation];
+        if (this.autoConveyor || (b.gx + fx === tower.gx && b.gy + fy === tower.gy)) fed = true;
+      }
+    }
+    return { fed, cached };
+  }
+
+  private reloadTowers(dt: number): void {
+    for (const tower of this.towers) {
+      if (!tower.def.ammoType) continue;
+      const { fed, cached } = this.ammoSupply(tower);
+      const mult = this.phase === 'build' ? RELOAD_BUILD : fed ? RELOAD_FED : RELOAD_UNFED;
+      tower.reload(dt, tower.def.fireRate * mult, cached ? AMMO_CACHE_MAG_MULT : 1);
+    }
   }
 
   // ── Pathfinding ───────────────────────────────────────────────────────────
@@ -707,16 +786,16 @@ export class GameScene extends Phaser.Scene {
     this.spawnQueue.sort((a, b) => a.timer - b.timer);
 
     // Store hpScale for use during spawning
-    this._currentHpScale = hpScale;
+    this.currentHpScale = hpScale;
 
     // Announce spawn edge
     const edge = this.getSpawnEdge();
-    this._currentSpawnEdge = edge;
+    this.currentSpawnEdge = edge;
     EventBus.emit('wave-started', this.waveNumber, edge);
   }
 
-  private _currentHpScale = 1;
-  private _currentSpawnEdge: 'top' | 'left' | 'right' = 'top';
+  private currentHpScale!: number;
+  private currentSpawnEdge!: 'top' | 'left' | 'right';
 
   private getSpawnEdge(): 'top' | 'left' | 'right' {
     const edges: Array<'top' | 'left' | 'right'> = ['top', 'left', 'right'];
@@ -738,7 +817,7 @@ export class GameScene extends Phaser.Scene {
     if (!def) return;
 
     const { x, y } = tileToWorld(gx, gy);
-    const enemy = new Enemy(this, def, x, y, this._currentHpScale);
+    const enemy = new Enemy(this, def, x, y, this.currentHpScale);
 
     let path = this.buildPathFor(gx, gy, (def.flying ?? false) || (def.tunneling ?? false));
     if (path.length === 0 && !def.flying && !def.tunneling) {
@@ -920,6 +999,8 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    this.reloadTowers(dt);
+
     if (this.phase === 'wave') {
       // Advance spawn queue
       for (const sq of this.spawnQueue) {
@@ -927,7 +1008,7 @@ export class GameScene extends Phaser.Scene {
       }
       while (this.spawnQueue.length > 0 && this.spawnQueue[0].timer <= 0) {
         const sq = this.spawnQueue.shift()!;
-        const tile = this.getSpawnTile(this._currentSpawnEdge);
+        const tile = this.getSpawnTile(this.currentSpawnEdge);
         this.spawnEnemy(sq.type, tile.gx, tile.gy);
       }
 

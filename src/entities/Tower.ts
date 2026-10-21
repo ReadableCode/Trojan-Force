@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TowerDef } from '../data/towers';
-import { TILE_SIZE, tileToWorld } from '../constants';
+import { TILE_SIZE, tileToWorld, MAGAZINE_SECS } from '../constants';
 import { Projectile } from './Projectile';
 import { Enemy } from './Enemy';
 import { ResourceManager } from '../ResourceManager';
@@ -23,6 +23,13 @@ export class Tower {
   // ── Research upgrade modifiers ──────────────────────────────────────────────
   extraSplash = 0;      // Explosive Shells adds splash radius (tiles)
   powerCostMult = 1;    // Power Grid reduces power cost per shot
+
+  // ── Ammo magazine (towers with an ammoType) ─────────────────────────────────
+  magazine = 0;
+  magazineCap = 0;
+  private reloadAccum = 0;
+  private ammoBar?: Phaser.GameObjects.Rectangle;
+  private ammoBarBg?: Phaser.GameObjects.Rectangle;
 
   constructor(
     scene: Phaser.Scene,
@@ -50,6 +57,37 @@ export class Tower {
     this.rangeCircle.setStrokeStyle(1, 0xffffff, 0.3);
     this.rangeCircle.setDepth(1);
     this.rangeCircle.setVisible(false);
+
+    if (def.ammoType) {
+      this.magazineCap = Math.ceil(def.fireRate * MAGAZINE_SECS);
+      this.ammoBarBg = scene.add.rectangle(x, y + 14, 24, 3, 0x221100).setDepth(4);
+      this.ammoBar = scene.add.rectangle(x - 12, y + 14, 0, 3, 0xffaa22).setDepth(4);
+      this.ammoBar.setOrigin(0, 0.5);
+    }
+  }
+
+  /**
+   * Refill the magazine from the shared stockpile. Each round bought costs
+   * ammoPerShot of the tower's ammoType.
+   */
+  reload(dt: number, roundsPerSec: number, capMult: number): void {
+    if (!this.def.ammoType) return;
+    this.magazineCap = Math.ceil(this.def.fireRate * MAGAZINE_SECS * capMult);
+    this.magazine = Math.min(this.magazine, this.magazineCap);
+
+    if (this.magazine >= this.magazineCap) {
+      this.reloadAccum = 0;
+    } else {
+      this.reloadAccum += dt * roundsPerSec;
+      const round = { [this.def.ammoType]: this.def.ammoPerShot ?? 1 };
+      while (this.reloadAccum >= 1 && this.magazine < this.magazineCap) {
+        if (!this.resources.spend(round)) { this.reloadAccum = 0; break; }
+        this.magazine++;
+        this.reloadAccum -= 1;
+      }
+    }
+
+    if (this.ammoBar) this.ammoBar.width = 24 * (this.magazine / this.magazineCap);
   }
 
   showRange(visible: boolean): void {
@@ -151,10 +189,7 @@ export class Tower {
   }
 
   private canFire(): boolean {
-    if (this.def.ammoType) {
-      const amt = this.def.ammoPerShot ?? 1;
-      if (!this.resources.canAfford({ [this.def.ammoType]: amt })) return false;
-    }
+    if (this.def.ammoType && this.magazine < 1) return false;
     if (this.def.usePower) {
       if (this.resources.get('power') < this.powerCost()) return false;
     }
@@ -162,9 +197,7 @@ export class Tower {
   }
 
   private consumeResources(): void {
-    if (this.def.ammoType) {
-      this.resources.spend({ [this.def.ammoType]: this.def.ammoPerShot ?? 1 });
-    }
+    if (this.def.ammoType) this.magazine--;
     if (this.def.usePower) {
       this.resources.spend({ power: this.powerCost() });
     }
@@ -174,5 +207,7 @@ export class Tower {
     if (this.sprite?.active) this.sprite.destroy();
     if (this.barrelSprite?.active) this.barrelSprite.destroy();
     if (this.rangeCircle?.active) this.rangeCircle.destroy();
+    if (this.ammoBar?.active) this.ammoBar.destroy();
+    if (this.ammoBarBg?.active) this.ammoBarBg.destroy();
   }
 }
